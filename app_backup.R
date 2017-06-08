@@ -36,6 +36,7 @@ summarize_eset<-function(mat,
   return(list(inds = inds, scores = x[inds]))
 } 
 
+
 get_gutc<-function(input, tab, header, datlist, sort.by){
   i<-get_BUID(input, tab)
   tab<-datlist[[header]][[i]]
@@ -142,21 +143,18 @@ get_gsproj_list<-function(gsnames, gsmethods, gsdir){
 get_de<-function(input, tab, 
   eset, landmark = FALSE, do.scorecutoff = TRUE, scorecutoff = c(-2, 2), 
   do.nmarkers = TRUE, nmarkers = c(100, 100),
-  summarize.func = c("mean", "median", "max", "min"),
-  fdat.id = c("id", "pr_gene_symbol", "pr_is_lmark"), 
-  pdat.id = c("pert_idose"), landmark.values = c("Y", "N")){
+  summarize.func = c("mean", "median", "max", "min")){
   i<-get_BUID(input, tab)
   eset<-eset[, eset$BUID %in% i]
   
   if(landmark)
-    eset<-eset[fData(eset)$pr_is_lmark %in% landmark.values[1],]
+    eset<-eset[fData(eset)$pr_is_lmark %in% "Y",]
   
   mat<-exprs(eset)
-  fdat<-fData(eset)[, fdat.id]
+  fdat<-fData(eset)[, c("id", "pr_gene_symbol", "pr_is_lmark")]
   pdat<-pData(eset)
 
-  pdat.names<- apply(pdat[, pdat.id, drop = FALSE], 1, function(i) paste(i, collapse = "_"))
-  colnames(mat)<-paste("modz_", pdat.names, sep = "")
+  colnames(mat)<-paste("modz_", pdat$pert_idose, sep = "")
   res<-summarize_eset(mat, summarize.func, do.scorecutoff, scorecutoff,
     do.nmarkers, nmarkers)
 
@@ -180,72 +178,61 @@ get_de_by_gene_hist<-function(input, eset){
     return(p)
 }
 
-get_de_by_gene_table<-function(input, eset, 
-  cols){
+get_de_by_gene_table<-function(input, eset){
     rowid<-which(fData(eset)$pr_gene_symbol %in% input)[1]
     x<-as.numeric(exprs(eset)[rowid,])
     pdat<-pData(eset)
+    cols<-c("sig_id", "Chemical.name", "CAS", "pert_idose", "pert_dose_RANK", "distil_ss", "distil_ss_RANK")
     df<-cbind(pdat[, cols], modz = x)
     df<-df[order(df$modz, decreasing = TRUE),]
 }
 
-get_de_by_gene_lm<-function(input, eset, values = c("Y", "N")){
+get_de_by_gene_lm<-function(input, eset){
    lms<-fData(eset)$pr_is_lmark
    rowid<-which(fData(eset)$pr_gene_symbol %in% input)[1]
-   if(lms[rowid] %in% values[1]) return(paste(input, " is a landmark gene", sep = ""))
+   if(lms[rowid] %in% "Y") return(paste(input, " is a landmark gene", sep = ""))
    else paste("Warning: ", input, " is an inferred gene!", sep = "")
 }
 
-filtereset<-function(eset, filteropt, tab, 
-  carc_label = "breast_carcinogen_any", 
-  geno_label = "Genotoxicity"
-  ){
-
-  pdat<-pData(eset)
-  carc<-pdat[, carc_label]
-  geno<-pdat[, geno_label]
-  source<-pdat[, "source"]
-  distil_ss<-pdat[, "distil_ss"]
-  tas<-pdat[, "tas"]
-
+filtereset<-function(eset, filteropt, tab){
   if (filteropt %in% "all")
     eset <- eset
   else if (filteropt %in% "carcinogens") 
-    eset<-eset[, carc %in% "POSITIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "POSITIVE"]
   else if (filteropt %in% "non-carcinogens") 
-    eset<-eset[, carc %in% "NEGATIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "NEGATIVE"]
   else if (filteropt %in% "genotoxic")
-    eset<-eset[, geno %in% "POSITIVE"]
+    eset<-eset[, eset$Genotoxicity %in% "POSITIVE"]
   else if (filteropt %in% "non-genotoxic")
-    eset<-eset[, geno %in% "NEGATIVE"]
+    eset<-eset[, eset$Genotoxicity %in% "NEGATIVE"]
   else if (filteropt %in% "genotoxic carcinogens") 
-    eset<-eset[, carc %in% "POSITIVE" & geno %in% "POSITIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "POSITIVE" & eset$Genotoxicity %in% "POSITIVE"]
   else if (filteropt %in% "nongenotoxic carcinogens") 
-    eset<-eset[, carc %in% "POSITIVE" & geno %in% "NEGATIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "POSITIVE" & eset$Genotoxicity %in% "NEGATIVE"]
   else if (filteropt %in% "genotoxic non-carcinogens") 
-    eset<-eset[, carc %in% "NEGATIVE" & geno %in% "POSITIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "NEGATIVE" & eset$Genotoxicity %in% "POSITIVE"]
   else if (filteropt %in% "non-genotoxic non-carcinogens") 
-    eset<-eset[, carc %in% "NEGATIVE" & geno %in% "NEGATIVE"]
+    eset<-eset[, eset$carc_liv_final %in% "NEGATIVE" & eset$Genotoxicity %in% "NEGATIVE"]
   else if (filteropt %in% "D. Sherr requested chemicals")
-    eset<-eset[, grep("collaborator_David_Sherr", source)]
+    eset<-eset[, grep("collaborator_David_Sherr", eset$source)]
   else if (filteropt %in% "J.Schlezinger requested chemicals")
-    eset<-eset[, grep("collaborator_J_Schlezinger", source)]
+    eset<-eset[, grep("collaborator_J_Schlezinger", eset$source)]
   else if (filteropt %in% "signal strength > 4")
-    eset<-eset[, distil_ss > 4]
+    eset<-eset[, eset$distil_ss > 4]
   else if (filteropt %in% "signal strength > 5")
-    eset<-eset[, distil_ss > 5]
+    eset<-eset[, eset$distil_ss > 5]
   else if (filteropt %in% "signal strength > 6")
-    eset<-eset[, distil_ss > 6]
-  #else if (filteropt %in% "q75 replicate correlation > 0.2")
-  #  eset<-eset[, eset$q75rep > 0.2]
-  #else if (filteropt %in% "q75 replicate correation > 0.3")
-  #  eset<-eset[, eset$q75rep > 0.3]
+    eset<-eset[, eset$distil_ss > 6]
+  else if (filteropt %in% "q75 replicate correlation > 0.2")
+    eset<-eset[, eset$q75rep > 0.2]
+  else if (filteropt %in% "q75 replicate correation > 0.3")
+    eset<-eset[, eset$q75rep > 0.3]
   else if (filteropt %in% "tas > 0.2")
-    eset<-eset[, tas > 0.2]
+    eset<-eset[, eset$tas > 0.2]
   else if (filteropt %in% "tas > 0.4")
-    eset<-eset[, tas > 0.4]
+    eset<-eset[, eset$tas > 0.4]
   else if (filteropt %in% "tas > 0.6")
-    eset<-eset[, tas > 0.6]
+    eset<-eset[, eset$tas > 0.6]
   else 
     eset<-eset[, eset$BUID %in% get_BUID(filteropt, tab)]
   return(eset)
@@ -286,11 +273,90 @@ data.table.round<-function(dt, digits = 4){
   dt<-data.table(dt)
 }
 
-#make a named list
-List <- function(...) {
-  names <- as.list(substitute(list(...)))[-1L]
-  setNames(list(...), names)
-}
+##load data dirs
+dirs<-fromJSON(file = "datadirs.json")
+
+##load data for chemical annotation tab
+chemannot<-readRDS(file = dirs$chemannotation_filename)
+
+##load data for Differential Expression tab
+deeset<-readRDS(dirs$diffexp_filename)
+
+#chemical selection dropdown
+chemicals<-get_ids_pdat(chemannot)
+
+#genes selection dropdown
+genes<-unique(fData(deeset)$pr_gene_symbol)
+
+#summarization function
+summarizefuncs<-c("max", "median", "mean", "min")
+
+#directory of heatmap data files
+heatmapdir<-dirs$genesetenrich_dir
+heatmapfiles<-gsub(".RDS", "",list.files(heatmapdir))
+
+
+premade_sets<-c("carcinogens", "non-carcinogens", "genotoxic", "non-genotoxic",
+  "genotoxic carcinogens", "nongenotoxic carcinogens",
+  "genotoxic non-carcinogens", "non-genotoxic non-carcinogens",
+  "D. Sherr requested chemicals", "J.Schlezinger requested chemicals",
+  "signal strength > 4", "signal strength > 5", "signal strength > 6",
+  "q75 replicate correlation > 0.2",
+  "q75 replicate correation > 0.3",
+  "tas > 0.2", "tas > 0.4", "tas > 0.6")
+
+filteropts<-c(list(premade_sets = premade_sets), chemicals)
+
+domain<-dirs$gct_dir
+
+dsmap<-list(Hallmark="gsscores_h.all.v5.0",
+    C2="gsscores_c2.cp.reactome.v5.0", 
+    NURSA="gsscores_nursa_consensome_Cbyfdrvalue_0.01.gmt")
+
+gctfiles<-names(dsmap)
+gctmethods<-c("gsproj", "gsva", "ssgsea", "zscore")
+
+##load data for GeneSetEnrichment tab
+gsnames<-dsmap
+gsmethods<-gctmethods
+gsdir<-dirs$genesetenrich_dir
+gslist<-get_gsproj_list(gsnames, gsmethods, gsdir)
+gssort<-c("min","Q1", "median", "mean","Q3","max")
+
+##gutc data
+gutcdir<-dirs$gutc_dir
+gutcfiles<-list.files(gutcdir)
+gutcheaders<-gsub(".RDS", "", gutcfiles)
+gutcobjects<-lapply(gutcfiles, function(i){
+  readRDS(paste(gutcdir, "/", i, sep = ""))
+  })
+names(gutcobjects)<-gutcheaders
+
+#tooltip texts
+helptextgutc<-HTML(paste("cs: raw weighted connectivity scores",
+              "ns: normalized scores, accounts for cell-line and perturbational type",
+              "ps: percentile normalized scores[-100, 100]",
+              "pcl: PCL (perturbational classes)", 
+              "pert: perturbagen level",
+              "cell: cell-line level",
+              "summary: cell line-summarized level", sep="<br/>"))
+
+helptextgsname<-HTML(paste("Hallmark: MSigDB Hallmark Pathways (v5.0)",
+              "C2: MSigDB C2 reactome Pathways (v5.0)",
+              "NURSA: Nuclear Receptor Signaling Atlas, consensome data for human", 
+               sep="<br/>"))
+
+helptextgsmethod<-HTML(paste("gsproj: GeneSetProjection for R package montilab:CBMRtools",
+              "gsva, ssgea, zscore: from R Bioconductor package GSVA", 
+               sep="<br/>"))
+
+
+helptextgsfilter<-HTML(paste("filter columns by premade sets or by chemical",
+              "premade sets:",
+              "carcinogenicity/genotoxicity based on CPDB mouse and rats data",
+              "D. Sherr suggested chemicals: mainly AHR ligands",
+              "J. Schlezinger suggested chemicals: mainly PPAR ligands",
+               sep="<br/>"))
 
 selectInputWithTooltip<-function(inputId, label, choices, bId, helptext, ...){
   selectInput(inputId, tags$span(label,  
@@ -298,120 +364,15 @@ selectInputWithTooltip<-function(inputId, label, choices, bId, helptext, ...){
               helptext)),
              choices, ...)}
 
-load_data<-function(config = "datadirs.json"){
-
-  ##load data dirs
-  dirs<-fromJSON(file = config)
-
-  ##load data for chemical annotation tab
-  chemannot<-readRDS(file = dirs$chemannotation_filename)
-
-  #remove multibyte string
-  chemannot$Chemical.name<-iconv(chemannot$Chemical.name)
-
-  ##load data for Differential Expression tab
-  deeset<-readRDS(dirs$diffexp_filename)
-
-  #chemical selection dropdown
-  chemicals<-get_ids_pdat(chemannot)
-
-  #genes selection dropdown
-  genes<-unique(fData(deeset)$pr_gene_symbol)
-
-  #summarization function
-  summarizefuncs<-c("max", "median", "mean", "min")
-
-  #directory of heatmap data files
-  heatmapdir<-dirs$genesetenrich_dir
-  heatmapfiles<-gsub(".RDS", "",list.files(heatmapdir))
-
-  premade_sets<-c("carcinogens", "non-carcinogens", "genotoxic", "non-genotoxic",
-    "genotoxic carcinogens", "nongenotoxic carcinogens",
-    "genotoxic non-carcinogens", "non-genotoxic non-carcinogens",
-    "signal strength > 4", "signal strength > 5", "signal strength > 6")
-
-  filteropts<-c(list(premade_sets = premade_sets), chemicals)
-  domain<-dirs$gct_dir
-
-  dsmap<-list(Hallmark="gsscores_h.all.v5.0",
-      C2="gsscores_c2.cp.reactome.v5.0", 
-      NURSA="gsscores_nursa_consensome_Cbyfdrvalue_0.01.gmt")
-
-  gctfiles<-names(dsmap)
-  gctmethods<-c("gsproj", "gsva", "ssgsea", "zscore")
-
-  ##load data for GeneSetEnrichment tab
-  gsnames<-list(Hallmark="gsscores_h.all.v5.0",
-      C2="gsscores_c2.cp.reactome.v5.0", 
-      NURSA="gsscores_nursa_consensome_Cbyfdrvalue_0.01.gmt")
-
-  gsmethods<-gctmethods
-  gsdir<-dirs$genesetenrich_dir
-  gslist<-get_gsproj_list(gsnames, gsmethods, gsdir)
-  gssort<-c("min","Q1", "median", "mean","Q3","max")
-
-  #gutc data
-  #gutcdir<-dirs$gutc_dir
-  #gutcfiles<-list.files(gutcdir)
-  #gutcheaders<-gsub(".RDS", "", gutcfiles)
-  #gutcobjects<-lapply(gutcfiles, function(i){
-  #  readRDS(paste(gutcdir, "/", i, sep = ""))
-  #  })
-  #names(gutcobjects)<-gutcheaders
-
-  #tooltip texts
-  helptextgutc<-HTML(paste("cs: raw weighted connectivity scores",
-                "ns: normalized scores, accounts for cell-line and perturbational type",
-                "ps: percentile normalized scores[-100, 100]",
-                "pcl: PCL (perturbational classes)", 
-                "pert: perturbagen level",
-                "cell: cell-line level",
-                "summary: cell line-summarized level", sep="<br/>"))
-
-  helptextgsname<-HTML(paste("Hallmark: MSigDB Hallmark Pathways (v5.0)",
-                "C2: MSigDB C2 reactome Pathways (v5.0)",
-                "NURSA: Nuclear Receptor Signaling Atlas, consensome data for human", 
-                 sep="<br/>"))
-
-  helptextgsmethod<-HTML(paste("gsproj: GeneSetProjection for R package montilab:CBMRtools",
-                "gsva, ssgea, zscore: from R Bioconductor package GSVA", 
-                 sep="<br/>"))
-
-
-  helptextgsfilter<-HTML(paste("filter columns by premade sets or by chemical",
-                "premade sets:",
-                "carcinogenicity/genotoxicity based on CPDB mouse and rats data",
-                "D. Sherr suggested chemicals: mainly AHR ligands",
-                "J. Schlezinger suggested chemicals: mainly PPAR ligands",
-                 sep="<br/>"))
-
-  fdat.id<-c("pr_id", "pr_gene_symbol", "pr_is_lmark", "reactome.category")
-  pdat.id<-c("pert_idose", "genotype")
-
-  dat <- List(chemannot, deeset, chemicals, genes, summarizefuncs, 
-      heatmapdir, heatmapfiles, premade_sets, filteropts, domain, 
-      dsmap, gctfiles, gctmethods, 
-      gsnames, gsmethods, gsdir, gslist, gssort,
-      helptextgutc, helptextgsname, helptextgsmethod, helptextgsfilter,
-      fdat.id, pdat.id
-    )
-
-  return(dat)
-
-
-}
-
-dat<-load_data()
-
 ##define app
 app<-shinyApp(
 
 ui = shinyUI(
   fluidPage(
- # tags$head(includeScript("google-analytics.js")),
-  navbarPage("CRCGN (MCF10A) Portal",
+  tags$head(includeScript("google-analytics.js")),
+  navbarPage("CRCGN Portal",
     tabPanel("About",
-      titlePanel("CRCGN (MCF10A) Portal"),
+      titlePanel("CRCGN Liver Portal"),
       fluidRow(
         column(11,
           includeMarkdown("introduction.Rmd")
@@ -422,7 +383,7 @@ ui = shinyUI(
 
     tabPanel("Chemical Annotation",
       DT::dataTableOutput("chemannot_result")
-    ),
+      ),
 
     tabPanel("Differential Expression",
       fluidPage(
@@ -436,9 +397,9 @@ ui = shinyUI(
 
           #dropdown menus
           fluidRow(
-            column(3, selectInput("chemical_de", "CRCGN Chemical:", dat$chemicals)),
+            column(3, selectInput("chemical_de", "CRCGN Chemical:", chemicals)),
             column(2, checkboxInput("landmark_de", "Landmark only", value =FALSE)),
-            column(2, selectInput("summarizefunc_de", "Summarization:",dat$summarizefuncs,
+            column(2, selectInput("summarizefunc_de", "Summarization:",summarizefuncs,
               selected = "median")),
             
             column(1,checkboxGroupInput("filterbyinput_de", "Filter by:",
@@ -467,7 +428,7 @@ ui = shinyUI(
         conditionalPanel(
           condition = "input.detype == 'by gene'",
           fluidRow(
-            column(3, selectInput("gene_de", "Gene symbol:", dat$genes)),
+            column(3, selectInput("gene_de", "Gene symbol:", genes)),
             column(3, textOutput("gene_de_lm"))
           ),
           tags$style(type='text/css', "#gene_de_lm { width:100%; margin-top: 25px;}"),
@@ -476,88 +437,88 @@ ui = shinyUI(
         )
       )
     ),
-    
-    tabPanel("Gene set enrichment",
+		
+		tabPanel("Gene set enrichment",
       fluidPage(
         fluidRow(
-          column(3, selectInput("chemical_gs", "CRCGN Chemical:", dat$chemicals)),
+          column(3, selectInput("chemical_gs", "CRCGN Chemical:", chemicals)),
           column(2, 
               selectInputWithTooltip(inputId = "gsname_gs", label = "Gene set name", 
-              choices = names(dat$gsnames), bId = "Bgsname", helptext =dat$helptextgsname)
+              choices = names(gsnames), bId = "Bgsname", helptext =helptextgsname)
             ),
           column(2,           
             selectInputWithTooltip(inputId = "gsmethod_gs", label = "Projection method", 
-              choices = dat$gsmethods, bId = "Bgsmethod", helptext =dat$helptextgsmethod)
+              choices = gsmethods, bId = "Bgsmethod", helptext =helptextgsmethod)
           ),
-          column(2, selectInput("summarize_gs", "Sort by:", dat$gssort,selected = "median"))
+          column(2, selectInput("summarize_gs", "Sort by:", gssort,selected = "median"))
           )
         ),
       DT::dataTableOutput("gsproj_result")
     ),
 
-     tabPanel("Heatmap (interactive)",
-       fluidRow(
-         column(3, 
-               selectInputWithTooltip(inputId = "gctfile", label = "Dataset", 
-               choices = dat$gctfiles, bId = "Bgsnamegct", helptext =dat$helptextgsname)
-           ),
-         column(2,
-               selectInputWithTooltip(inputId = "gctmethod", label = "Projection method", 
-               choices = dat$gctmethods, bId = "Bgsmethodgct", helptext =dat$helptextgsmethod)
-           )
-         ),
-       htmlOutput("morpheus_result_link"),
-       htmlOutput("morpheus_result_embedded")
-       ),
+    tabPanel("Heatmap (interactive)",
+      fluidRow(
+        column(3, 
+              selectInputWithTooltip(inputId = "gctfile", label = "Dataset", 
+              choices = gctfiles, bId = "Bgsnamegct", helptext =helptextgsname)
+          ),
+        column(2,
+              selectInputWithTooltip(inputId = "gctmethod", label = "Projection method", 
+              choices = gctmethods, bId = "Bgsmethodgct", helptext =helptextgsmethod)
+          )
+        ),
+      htmlOutput("morpheus_result_link"),
+      htmlOutput("morpheus_result_embedded")
+      ),
 
-     tabPanel("Heatmap (static)",
+    tabPanel("Heatmap (static)",
+      fluidPage(
+        fluidRow(         
+        column(3, 
+              selectInputWithTooltip(inputId = "gsfile_heatmap", label = "Dataset", 
+              choices = gctfiles, bId = "Bgsnamegctstatic", helptext =helptextgsname)
+              ),
+        column(2, 
+              selectInputWithTooltip(inputId = "gsmethod_heatmap", label = "Projection method", 
+              choices = gctmethods, bId = "Bgsmethodgctstatic", helptext =helptextgsmethod)
+          ), 
+        column(3, 
+          selectInputWithTooltip(inputId = "filteropt", label = "Column Filter", 
+          choices = filteropts, 
+          selected = "signal strength > 6", bId = "Bgsfilterstatic", helptext = helptextgsfilter)
+          )
+        ),
+        plotOutput("heatmap_result")
+
+      )
+     ),
+
+     tabPanel("Connectivity",
        fluidPage(
          fluidRow(         
-         column(3, 
-               selectInputWithTooltip(inputId = "gsfile_heatmap", label = "Dataset", 
-               choices = dat$gctfiles, bId = "Bgsnamegctstatic", helptext =dat$helptextgsname)
-               ),
-         column(2, 
-               selectInputWithTooltip(inputId = "gsmethod_heatmap", label = "Projection method", 
-               choices = dat$gctmethods, bId = "Bgsmethodgctstatic", helptext =dat$helptextgsmethod)
-           ), 
-         column(3, 
-           selectInputWithTooltip(inputId = "filteropt", label = "Column Filter", 
-           choices = dat$filteropts, 
-           selected = "signal strength > 6", bId = "Bgsfilterstatic", helptext = dat$helptextgsfilter)
-           )
+          column(3, selectInput("chemical_gutc", "CRCGN Chemical:", chemicals)),
+          column(3,
+            selectInputWithTooltip(inputId = "header_gutc", label = "Dataset", 
+              choices = gutcheaders, bId = "Bgutc", helptext =helptextgutc)
+            ),
+          column(2, selectInput("summarize_gutc", "Sort by:", gssort, selected = "median"))
          ),
-         plotOutput("heatmap_result")
+         dataTableOutput("chemical_description_gutc"),
+         tags$style(type="text/css", '#chemical_description_de tfoot {display:none;}'),
+
+         ##insert empty space
+         fluidRow(column(width = 1, offset = 0, style='padding:10px;')),
+
+         dataTableOutput("gutc_result")
 
        )
-      )# ,
+     )
 
-     # tabPanel("Connectivity",
-     #   fluidPage(
-     #     fluidRow(         
-     #      column(3, selectInput("chemical_gutc", "CRCGN Chemical:", chemicals)),
-     #      column(3,
-     #        selectInputWithTooltip(inputId = "header_gutc", label = "Dataset", 
-     #          choices = gutcheaders, bId = "Bgutc", helptext =helptextgutc)
-     #        ),
-     #      column(2, selectInput("summarize_gutc", "Sort by:", gssort, selected = "median"))
-     #     ),
-     #     dataTableOutput("chemical_description_gutc"),
-     #     tags$style(type="text/css", '#chemical_description_de tfoot {display:none;}'),
-
-     #     ##insert empty space
-     #     fluidRow(column(width = 1, offset = 0, style='padding:10px;')),
-
-     #     dataTableOutput("gutc_result")
-
-     #   )
-     # )
-
-  ))),
+	))),
 
 server = shinyServer(function(input, output, session) {
 
-  output$chemannot_result<-DT::renderDataTable({data.table.round(dat$chemannot)},
+  output$chemannot_result<-DT::renderDataTable({data.table.round(chemannot)},
     extensions = 'Buttons', 
     server = TRUE,
     options = list(dom = 'T<"clear">Blfrtip', 
@@ -570,9 +531,7 @@ server = shinyServer(function(input, output, session) {
     buttons=c('copy','csv','print')))
 
   output$gene_de_table<-renderDataTable({
-    data.table.round(get_de_by_gene_table(input$gene_de, dat$deeset,
-      cols<-c("sig_id", "Chemical.name", "CAS", "pert_idose", 
-        "dose_rank", "distil_ss", "ss_rank")))
+    data.table.round(get_de_by_gene_table(input$gene_de, deeset))
     },
     extensions = 'Buttons', 
     server = TRUE,
@@ -587,15 +546,15 @@ server = shinyServer(function(input, output, session) {
    )
 
   output$gene_de_hist<-renderPlot({
-    get_de_by_gene_hist(input$gene_de, dat$deeset)
+    get_de_by_gene_hist(input$gene_de, deeset)
     }, width = 1000, height = 300)
 
   output$gene_de_lm<-renderText({
-    get_de_by_gene_lm(input$gene_de, dat$deeset, values = c(1, 0))
+    get_de_by_gene_lm(input$gene_de, deeset)
     })
 
   output$gsproj_result <- DT::renderDataTable({
-      eset<-get_gsproj(input$chemical_gs, dat$gslist, dat$chemannot, input$gsname_gs, input$gsmethod_gs)
+      eset<-get_gsproj(input$chemical_gs, gslist, chemannot, input$gsname_gs, input$gsmethod_gs)
       res<-summarize_gsproj(eset, order.col = input$summarize_gs)
       return(res)
     }, 
@@ -620,31 +579,28 @@ server = shinyServer(function(input, output, session) {
 
   output$chemical_description_de<-DT::renderDataTable({
     get_chemical_description(input = input$chemical_de, 
-      tab = dat$chemannot,
-      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "breast_carcinogen_any"))
+      tab = chemannot,
+      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "carc_liv_final"))
 
     }, options = list(dom = ''))
 
   output$chemical_description_gutc<-DT::renderDataTable({
     get_chemical_description(input = input$chemical_gutc, 
-      tab = dat$chemannot,
-      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "breast_carcinogen_any"))
+      tab = chemannot,
+      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "carc_liv_final"))
 
     }, options = list(dom = ''))
 
 
   output$result_de<-DT::renderDataTable({
-      get_de(input$chemical_de, tab=dat$chemannot, 
-        eset = dat$deeset, 
+      get_de(input$chemical_de, tab=chemannot, 
+        eset = deeset, 
         landmark = input$landmark_de, 
         do.scorecutoff = "score" %in% input$filterbyinput_de, 
         scorecutoff = c(input$range_de[1], input$range_de[2]), 
         do.nmarkers = "number" %in% input$filterbyinput_de, 
         nmarkers = c(input$numberthresleft_de, input$numberthresright_de),
-        summarize.func = input$summarizefunc_de,
-        fdat.id = dat$fdat.id, 
-        pdat.id = dat$pdat.id,
-        landmark.values = c(1, 0))
+        summarize.func = input$summarizefunc_de)
     },
     extensions = 'Buttons', 
     server = TRUE,
@@ -658,28 +614,25 @@ server = shinyServer(function(input, output, session) {
     buttons=c('copy','csv','print')))
 
   output$heatmap_result<-renderPlot({
-      outfileheader<-get_heatmap_eset(ds = input$gsfile_heatmap, dsmap = dat$dsmap, method = input$gsmethod_heatmap)
-      outfile<-paste(dat$heatmapdir, "/", outfileheader, sep = "")
+      outfileheader<-get_heatmap_eset(ds = input$gsfile_heatmap, dsmap = dsmap, method = input$gsmethod_heatmap)
+      outfile<-paste(heatmapdir, "/", outfileheader, sep = "")
       eset<-readRDS(outfile)
-      eset<-filtereset(eset, input$filteropt, dat$chemannot)
+      eset<-filtereset(eset, input$filteropt, chemannot)
 
       cns<-as.character(sapply(as.character(eset$Chemical.name), 
         function(i) subset_names(i,25)))
       cns<-make.unique(cns) #in case truncation produces non-unique ids
       colnames(eset)<-paste(cns, "_", eset$pert_dose_RANK, sep = "")
       hc<-clust_eset(eset)
-
-      col_legend_names<-c("breast_carcinogen_any", "Genotoxicity")
-
-      col_legend<-list(list(col_breaks = c("POSITIVE", "NEGATIVE"), 
-        col_values = sapply(c("orange", "green"), to.hex),
-        col_labels = c("POSITIVE", "NEGATIVE")),
-       list(col_breaks = c("POSITIVE", "NEGATIVE"), 
-        col_values = sapply(c("orange", "green"), to.hex),
-        col_labels = c("POSITIVE", "NEGATIVE"))
-      )
-      names(col_legend)<-col_legend_names
-
+      col_legend<-list(carc_liv_final = list(col_breaks = c("POSITIVE", "NEGATIVE", ""), 
+        col_values = sapply(c("orange", "green", "white"), to.hex),
+        col_labels = c("POSITIVE", "NEGATIVE", "")),
+      Genotoxicity = list(col_breaks = c("POSITIVE", "NEGATIVE", ""), 
+        col_values = sapply(c("orange", "green", "white"), to.hex),
+        col_labels = c("POSITIVE", "NEGATIVE", "")),
+      pert_dose_RANK = list(col_breaks = 1:6, 
+        col_values = rev(gray.colors(6)),
+        col_labels = 1:6))
       hmcolors<-function(...) scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, ...)
     
       ncols<-ncol(eset)
@@ -698,7 +651,7 @@ server = shinyServer(function(input, output, session) {
         hr = hc$hr, 
         hmcolors = hmcolors,
         hmtitle = "geneset score",
-        col_lab = col_legend_names, 
+        col_lab = c("carc_liv_final", "Genotoxicity", "pert_dose_RANK"), 
         col_legend = col_legend,
         ylabstr = "",
         fout = NA, 
@@ -712,25 +665,25 @@ server = shinyServer(function(input, output, session) {
 
   output$morpheus_result_link<-renderText({
       paste(c('<a target="_blank" href="',
-      get_morpheus_link(url =get_heatmap_gct(ds=input$gctfile, dsmap = dat$dsmap, 
+      get_morpheus_link(url =get_heatmap_gct(ds=input$gctfile, dsmap = dsmap, 
           method = input$gctmethod), 
-        domain = dat$domain),
+        domain = domain),
         '">', 'click here to open in new tab', '</a>'), sep = "")
       })
 
   output$morpheus_result_embedded<-renderText({
       paste(c('<iframe width ="1200" height ="680" src="',
-      get_morpheus_link(url = get_heatmap_gct(ds=input$gctfile, dsmap = dat$dsmap, 
+      get_morpheus_link(url = get_heatmap_gct(ds=input$gctfile, dsmap = dsmap, 
           method = input$gctmethod), 
-        domain = dat$domain),
+        domain = domain),
         '">', '</iframe>'), sep = "")
       })
 
   output$gutc_result<-DT::renderDataTable({
       get_gutc(input = input$chemical_gutc, 
-        tab = dat$chemannot, 
+        tab = chemannot, 
         header = input$header_gutc, 
-        datlist = dat$gutcobjects,
+        datlist = gutcobjects,
         sort.by = input$summarize_gutc)
     },    
     extensions = 'Buttons', 
@@ -747,5 +700,4 @@ server = shinyServer(function(input, output, session) {
 })
 
 )
-
 

@@ -10,7 +10,7 @@ An interactive portal for retrieving and visualizing data from the CRCGN liver p
 
 ### Dataset details
 
-This experiment uses 330 selected chemicals for in-vivo liver carcinogenicity testing, including 128 liver carcinogens, 168 non-carcinogens, and 34 miscellaneous chemicals (e.g. nuclear receptor ligands). Chemical carcinogenicity and genotoxicity annotations are based on the Carcinogenicity Potency Database ([CPDB](https://toxnet.nlm.nih.gov/cpdb/)), which is the result of tissue-specific long-term animal cancer tests in rodents. In the CRCGN project, HepG2 (liver) cells are exposed to each individual chemical for 24 hours and the gene expression is profiled on the L1000 platform. Each chemical is assayed at 6 doses (2 fold dilutions starting from the highest concentration of 40uM or 20uM) with triplicate profiles generated for each dose. For each chemical and dose profile, the gene expression of 1000 landmark genes are measured as a moderated z-score (weighted collapsed z-score of the 3 replicate perturbational profiles with respect to the entire plate).
+This experiment uses 345 selected chemicals for breast carcinogenicity testing, including 120 breast carcinogens, 114 non-carcinogens, and 68 miscellaneous chemicals (e.g. nuclear receptor ligands, BU SRP chemicals, lung carcinogens). Chemical carcinogenicity and genotoxicity annotations are based on the Carcinogenicity Potency Database ([CPDB](https://toxnet.nlm.nih.gov/cpdb/)), which is the result of tissue-specific long-term animal cancer tests in rodents, or breast carcinogens published from Rudel et. al (2007). In the CRCGN project, MCF10A (breast epithelial) cells are exposed to each individual chemical for 24 hours and the gene expression is profiled on the L1000 platform. Each chemical is assayed at 3 doses (3 fold dilutions starting from the highest concentration of 100uM, with the exception of certain BU SRP chemicals which had custom chosen starting concentrations) with triplicate profiles generated for each dose. This experiment is repeated also on MCF10A TP53- cells. For each chemical and dose profile, the gene expression of 1000 landmark genes are measured as a moderated z-score (weighted collapsed z-score of the 3 replicate perturbational profiles with respect to the entire plate).
 
 ### Chemical Annotation
 
@@ -32,7 +32,7 @@ A heatmap visualizer to explore gene set enrichment results. For details, see [M
 
 A static heatmap visualizer to explore gene set enrichment results, with option to subset samples to several premade chemical sets.
 
-### Connectivity
+### Connectivity (In progress)
 
 Summarizes the similarity of CRCGN liver profiles to profiles in the CMAP database (containing ~9000 unique annotated perturbagens, 84 perturbagen classes). Results are filtered top 50 (highest connectivity) and bottom 50 (lowest connectivity), representing the top hits for signature concordance and signature reversal respectively. 
 
