@@ -40,6 +40,7 @@ get_gutc<-function(input, tab, header, datlist, sort.by){
   i<-get_BUID(input, tab)
   tab<-datlist[[header]][[i]]
   tab<-clean_gutc(tab, sort.by)
+  tab<-data.table.multibyte.string(tab)
   tab<-data.table.round(tab)
   return(tab)
 }
@@ -286,6 +287,15 @@ data.table.round<-function(dt, digits = 4){
   dt<-data.table(dt)
 }
 
+data.table.multibyte.string<-function(df){
+  strcol<-which(sapply(df, function(i) !is.numeric(i)))
+  for(i in strcol){
+    df[, i]<-as.character(iconv(df[, i]))
+  }
+  return(df)
+
+}
+
 #make a named list
 List <- function(...) {
   names <- as.list(substitute(list(...)))[-1L]
@@ -351,13 +361,13 @@ load_data<-function(config = "datadirs.json"){
   gssort<-c("min","Q1", "median", "mean","Q3","max")
 
   #gutc data
-  #gutcdir<-dirs$gutc_dir
-  #gutcfiles<-list.files(gutcdir)
-  #gutcheaders<-gsub(".RDS", "", gutcfiles)
-  #gutcobjects<-lapply(gutcfiles, function(i){
-  #  readRDS(paste(gutcdir, "/", i, sep = ""))
-  #  })
-  #names(gutcobjects)<-gutcheaders
+  gutcdir<-dirs$gutc_dir
+  gutcfiles<-list.files(gutcdir)
+  gutcheaders<-gsub(".RDS", "", gutcfiles)
+  gutcobjects<-lapply(gutcfiles, function(i){
+    readRDS(paste(gutcdir, "/", i, sep = ""))
+    })
+  names(gutcobjects)<-gutcheaders
 
   #tooltip texts
   helptextgutc<-HTML(paste("cs: raw weighted connectivity scores",
@@ -393,7 +403,8 @@ load_data<-function(config = "datadirs.json"){
       dsmap, gctfiles, gctmethods, 
       gsnames, gsmethods, gsdir, gslist, gssort,
       helptextgutc, helptextgsname, helptextgsmethod, helptextgsfilter,
-      fdat.id, pdat.id
+      fdat.id, pdat.id,
+      gutcobjects, gutcheaders
     )
 
   return(dat)
@@ -530,28 +541,28 @@ ui = shinyUI(
          plotOutput("heatmap_result")
 
        )
-      )# ,
+      ) ,
 
-     # tabPanel("Connectivity",
-     #   fluidPage(
-     #     fluidRow(         
-     #      column(3, selectInput("chemical_gutc", "CRCGN Chemical:", chemicals)),
-     #      column(3,
-     #        selectInputWithTooltip(inputId = "header_gutc", label = "Dataset", 
-     #          choices = gutcheaders, bId = "Bgutc", helptext =helptextgutc)
-     #        ),
-     #      column(2, selectInput("summarize_gutc", "Sort by:", gssort, selected = "median"))
-     #     ),
-     #     dataTableOutput("chemical_description_gutc"),
-     #     tags$style(type="text/css", '#chemical_description_de tfoot {display:none;}'),
+     tabPanel("Connectivity",
+       fluidPage(
+         fluidRow(         
+          column(3, selectInput("chemical_gutc", "CRCGN Chemical:", dat$chemicals)),
+          column(3,
+            selectInputWithTooltip(inputId = "header_gutc", label = "Dataset", 
+              choices = dat$gutcheaders, bId = "Bgutc", helptext =dat$helptextgutc)
+            ),
+          column(2, selectInput("summarize_gutc", "Sort by:", dat$gssort, selected = "median"))
+         ),
+         dataTableOutput("chemical_description_gutc"),
+         tags$style(type="text/css", '#chemical_description_de tfoot {display:none;}'),
 
-     #     ##insert empty space
-     #     fluidRow(column(width = 1, offset = 0, style='padding:10px;')),
+         ##insert empty space
+         fluidRow(column(width = 1, offset = 0, style='padding:10px;')),
 
-     #     dataTableOutput("gutc_result")
+         dataTableOutput("gutc_result")
 
-     #   )
-     # )
+       )
+     )
 
   ))),
 
