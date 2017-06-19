@@ -6,7 +6,7 @@ output:
   theme: united
 ---
 
-An interactive portal for retrieving and visualizing data from the CRCGN liver project
+An interactive portal for retrieving and visualizing data from the MCF10A breast carcinogenome project
 
 ### Dataset details
 
