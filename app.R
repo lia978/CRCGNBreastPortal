@@ -420,9 +420,9 @@ app<-shinyApp(
 ui = shinyUI(
   fluidPage(
  # tags$head(includeScript("google-analytics.js")),
-  navbarPage("CRCGN (MCF10A) Portal",
+  navbarPage("MCF10A Portal",
     tabPanel("About",
-      titlePanel("CRCGN (MCF10A) Portal"),
+      titlePanel("MCF10A Portal"),
       fluidRow(
         column(11,
           includeMarkdown("introduction.Rmd")
