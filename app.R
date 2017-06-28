@@ -3,9 +3,9 @@ library(Biobase)
 library(data.table)
 library(rjson)
 library(DT)
-library(CBMRtools)
 library(shinyBS)
 
+source("ggheat.continuous.R")
 
 #get top and bottom matches for given eset of connectivity scores
 summarize_eset<-function(mat, 
