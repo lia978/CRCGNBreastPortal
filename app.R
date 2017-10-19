@@ -95,7 +95,7 @@ get_BUID<-function(input, tab){
   as.character(tab[which(apply(tab, 1, function(i) any(i %in% input)))[1], "BUID"])
 }
 
-get_ids_pdat<-function(pdat, cols = c("Chemical.name", "CAS", "BUID"), col.unique = "BUID",
+get_ids_pdat<-function(pdat, cols = c("Chemical Name", "CAS", "BUID"), col.unique = "BUID",
   val.ignore = c("", " ", NA, "NA", "NOCAS")){
   tab<-unique(pdat[, cols])
   res<-lapply(cols, function(i){
@@ -296,6 +296,17 @@ data.table.multibyte.string<-function(df){
 
 }
 
+get_genecard_link<-function(genesymbol){
+  sprintf('<a href="http://www.genecards.org/cgi-bin/carddisp.pl?gene=%s&keywords=%s" target="_blank" class="btn btn-primary">%s</a>',
+    genesymbol, genesymbol, genesymbol)
+}
+
+get_geneset_link<-function(geneset){
+  sprintf('<a href="http://software.broadinstitute.org/gsea/msigdb/cards/%s" target="_blank" class="btn btn-primary">%s</a>',
+    geneset, geneset)
+
+}
+
 #make a named list
 List <- function(...) {
   names <- as.list(substitute(list(...)))[-1L]
@@ -318,6 +329,17 @@ load_data<-function(config = "datadirs.json"){
 
   #remove multibyte string
   chemannot$Chemical.name<-iconv(chemannot$Chemical.name)
+
+  colnames(chemannot)<-c("Broad_external_Id", "Mean Signal Strength", 
+    "BUID", "Chemical Name", "CAS", "Genotoxicity",
+   "Breast Carcinogenicity", "Lung Carcinogenicity", 
+   "Breast Carcinogenicity CPDB", "CPDB Lung Carcinogenicity CPDB", 
+   "source")
+  chemannot<-chemannot[,   c( "BUID", "Chemical Name", "CAS", "Genotoxicity",
+   "Breast Carcinogenicity", "Lung Carcinogenicity", 
+   "Breast Carcinogenicity CPDB", "CPDB Lung Carcinogenicity CPDB", 
+   "Mean Signal Strength", "Broad_external_Id",
+   "source")]
 
   ##load data for Differential Expression tab
   deeset<-readRDS(dirs$diffexp_filename)
@@ -615,46 +637,54 @@ server = shinyServer(function(input, output, session) {
     })
 
   output$gsproj_result <- DT::renderDataTable({
+      currgsname<-input$gsname_gs
       eset<-get_gsproj(input$chemical_gs, dat$gslist, dat$chemannot, input$gsname_gs, input$gsmethod_gs)
       res<-summarize_gsproj(eset, order.col = input$summarize_gs)
+      res<-data.frame(res)
+      res<-res[, setdiff(colnames(res), "rowIDs")]
+      #return hyperlink to MSigDB genesets
+      if(currgsname %in% c("Hallmark", "C2"))
+        res$genesets<-sapply(as.character(res$genesets), get_geneset_link)
       return(res)
     }, 
     extensions = 'Buttons',
     server = FALSE,
-    options = list (dom = 'T<"clear">Blfrtip',
-      autoWidth = FALSE,
-      columnDefs = list(list(width = '100px', targets = list(2), className = 'dt-center',
-          render = JS(
-            "function(data, type, row, meta) {",
-            "return type === 'display' && data.length > 30 ?",
-            "'<span title=\"' + data + '\">' + data.substr(0, 30) + '..</span>' : data;",
-            "}")), 
-      list(targets = list(1), visible = FALSE)
-      ),
-      deferRender=TRUE,
-      scrollCollapse=TRUE,
-      pageLength = 10, lengthMenu = c(10,50,100,200,1000),
-      buttons=c('copy','csv','print')
-    )
+    escape = FALSE#,
+    # options = list (dom = 'T<"clear">Blfrtip',
+    #   autoWidth = FALSE,
+    #   columnDefs = list(list(width = '100px', targets = list(2), className = 'dt-center',
+    #       render = JS(
+    #         "function(data, type, row, meta) {",
+    #         "return type === 'display' && data.length > 30 ?",
+    #         "'<span title=\"' + data + '\">' + data.substr(0, 30) + '..</span>' : data;",
+    #         "}")), 
+    #   list(targets = list(1), visible = FALSE)
+    #   ),
+    #   deferRender=TRUE,
+    #   scrollCollapse=TRUE,
+    #   pageLength = 10, lengthMenu = c(10,50,100,200,1000),
+    #   buttons=c('copy','csv','print')
+    # )
   )
 
   output$chemical_description_de<-DT::renderDataTable({
     get_chemical_description(input = input$chemical_de, 
       tab = dat$chemannot,
-      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "breast_carcinogen_any"))
+      cols.keep = c("BUID", "Chemical Name", "CAS", "Broad_external_Id", "Breast Carcinogenicity"))
 
     }, options = list(dom = ''))
 
   output$chemical_description_gutc<-DT::renderDataTable({
-    get_chemical_description(input = input$chemical_gutc, 
+    chem_desc_table<-get_chemical_description(input = input$chemical_gutc, 
       tab = dat$chemannot,
-      cols.keep = c("BUID", "Chemical.name", "CAS", "Broad_external_Id", "breast_carcinogen_any"))
-
+      cols.keep = c("BUID", "Chemical Name", "CAS", "Broad_external_Id", "Breast Carcinogenicity"))
+   # colnames(chem_desc_table)<-c("BUID", "Chemical Name", "CAS", "Broad_external_Id", "Breast Carcinogenicity")
+    return(chem_desc_table)
     }, options = list(dom = ''))
 
 
   output$result_de<-DT::renderDataTable({
-      get_de(input$chemical_de, tab=dat$chemannot, 
+      de_table<-get_de(input$chemical_de, tab=dat$chemannot, 
         eset = dat$deeset, 
         landmark = input$landmark_de, 
         do.scorecutoff = "score" %in% input$filterbyinput_de, 
@@ -665,7 +695,19 @@ server = shinyServer(function(input, output, session) {
         fdat.id = dat$fdat.id, 
         pdat.id = dat$pdat.id,
         landmark.values = c(1, 0))
+      de_table$pr_gene_symbol<-sapply(as.character(de_table$pr_gene_symbol), get_genecard_link)
+
+      cn<-colnames(de_table)
+      cn[cn %in% "pr_id"]<-"Affy ID"
+      cn[cn %in% "pr_gene_symbol"]<-"Gene Symbol"
+      cn[cn %in% "pr_is_lmark"]<-"Is Landmark Gene"
+      cn[cn %in% "summaryscore"]<-"Summary Mod-Zscore"
+      cn[cn %in% "reactome.category"]<-"Reactome Category"
+      colnames(de_table)<-cn
+
+      return(de_table)
     },
+    escape = FALSE,
     extensions = 'Buttons', 
     server = TRUE,
     options = list(dom = 'T<"clear">Blfrtip', 
